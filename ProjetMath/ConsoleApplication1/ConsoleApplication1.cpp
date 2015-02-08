@@ -51,15 +51,16 @@ int windowHeight = 500;
 
 
 // States variables
-bool drawFenetre = true;
+int drawMode = -1;
+bool windowIsFinsih = false;
 bool sensFenetre = true;
-bool drawPolygon = true;
-int currentPolygon = 0;
+int currentPolygon = -1;
+vector<bool> polygonIsFinsih;
 
 
 // Polygons variables
 vector<point> window;
-vector<vector<point>> polygons{ vector<point>() };
+vector<vector<point>> polygons;
 
 
 // Prototypes
@@ -68,6 +69,16 @@ void DrawPolygonWire(vector<point> polygon, float r, float g, float b);
 void DrawPolygonFlat(vector<point> polygon, float r, float g, float b);
 void Keyboard(unsigned char touche, int x, int y);
 void Mouse(int bouton, int etat, int x, int y); 
+
+void AddMenu();
+void Select(int selection);
+void SelectDrawWindow(int selection);
+void SelectDrawPolygon(int selection);
+void Reset();
+void StartDrawWindow();
+void EndDrawWindow();
+void StartDrawNewPolygon();
+void EndDrawPolygon();
 
 void RemplissageRégionConnexité4Recursif(int x, int y, float r, float g, float b);
 void RemplissageRégionConnexité4Iteratif(int x, int y, float r, float g, float b);
@@ -115,6 +126,8 @@ int main(int argc, char **argv)
 	glutKeyboardFunc(Keyboard);
 	glutMouseFunc(Mouse);
 
+	AddMenu();
+
 	// rq: le callback de fonction (fonction de rappel) est une fonction qui est passée en argument à une
 	// autre fonction. Ici, le main fait usage des deux fonctions de rappel (qui fonctionnent en même temps)
 	// alors qu'il ne les connaît pas par avance.
@@ -143,16 +156,17 @@ void DisplayPolygons()
 	{
 		DrawPolygonWire(polygons[i], 1.0, 0.0, 0.0);
 	}
-
-	if (!drawFenetre && !drawPolygon)
+	
+	if (windowIsFinsih)
 	{
 		for (int i = 0; i < polygons.size(); ++i)
 		{
 			vector<point> polygonOut = AlgoSutherlandHodgman(polygons[i]);
-			DrawPolygonFlat(polygonOut, 0.0, 1.0, 0.0);
+			if (polygonIsFinsih[i] && polygonOut.size() > 2)
+				DrawPolygonFlat(polygonOut, 0.0, 1.0, 0.0);
 		}
 	}
-
+	
 	glutSwapBuffers();
 	glFlush();
 }
@@ -185,11 +199,11 @@ void Mouse(int button, int state, int x, int y)
 {
 	if (button == GLUT_LEFT_BUTTON && state == GLUT_DOWN)
 	{
-		if (drawFenetre)
+		if (drawMode == 0)
 		{
 			window.push_back(point(x, y));
 		}
-		else if (drawPolygon)
+		else if (drawMode == 1)
 		{
 			polygons[currentPolygon].push_back(point(x, y));
 		}
@@ -200,45 +214,14 @@ void Mouse(int button, int state, int x, int y)
 
 
 void Keyboard(unsigned char touche, int x, int y){
-	switch (touche){
-
+	switch (touche)
+	{
 	case 'q':/* Quitter le programme */
 		exit(0);
 		break;
 
 	case 'r':
-		drawPolygon = true;
-		drawFenetre = true;
-		currentPolygon = 0;
-		window.clear();
-		polygons.clear();
-		polygons.push_back(vector<point>());
-		break;
-
-	case VK_SPACE:
-		if (drawFenetre && window.size() > 2)
-		{
-			window.push_back(window[0]);
-
-			sensFenetre = DetectWindowDirection();
-			drawFenetre = false;
-		}
-		else if (!drawFenetre && drawPolygon)
-		{
-			polygons[currentPolygon].push_back(polygons[currentPolygon][0]);
-
-			drawPolygon = false;
-		}
-		break;
-
-	case '+':
-		if (!drawFenetre && drawPolygon)
-		{
-			polygons[currentPolygon].push_back(polygons[currentPolygon][0]);
-
-			currentPolygon++;
-			polygons.push_back(vector<point>());
-		}
+		Reset();
 		break;
 	}
 
@@ -247,6 +230,134 @@ void Keyboard(unsigned char touche, int x, int y){
 
 
 #pragma endregion GLUT
+
+
+
+#pragma region MENU
+
+
+void AddMenu()
+{
+	int menuWindow = glutCreateMenu(SelectDrawWindow);
+	glutAddMenuEntry("Start", 1);
+	glutAddMenuEntry("End", 2);
+	int menuPolygon = glutCreateMenu(SelectDrawPolygon);
+	glutAddMenuEntry("Start New", 1);
+	glutAddMenuEntry("End", 2);
+	glutCreateMenu(Select);
+	glutAddSubMenu("Draw Window", menuWindow);
+	glutAddSubMenu("Draw Polygon", menuPolygon);
+	glutAddMenuEntry("Reset", 3);
+	glutAddMenuEntry("Quitter", 0);
+	glutAttachMenu(GLUT_RIGHT_BUTTON);
+}
+
+
+void Select(int selection)
+{
+	switch (selection) {
+	case 0:
+		exit(0);
+		break;
+	case 3:
+		Reset();
+		break;
+	}
+	glutPostRedisplay();
+}
+
+
+void SelectDrawWindow(int selection)
+{
+	switch (selection) {
+	case 1:
+		StartDrawWindow();
+		break;
+	case 2:
+		EndDrawWindow();
+		break;
+	}
+	glutPostRedisplay();
+}
+
+
+void SelectDrawPolygon(int selection)
+{
+	switch (selection) {
+	case 1:
+		StartDrawNewPolygon();
+		break;
+	case 2:
+		EndDrawPolygon();
+		break;
+	}
+	glutPostRedisplay();
+}
+
+
+void Reset()
+{
+	drawMode = -1;
+	
+	windowIsFinsih = false;
+	window.clear();
+
+	polygons.clear();
+	currentPolygon = 0;
+	polygonIsFinsih.clear();
+}
+
+
+void StartDrawWindow()
+{
+	if (drawMode == 1)
+		EndDrawPolygon();
+
+	drawMode = 0;
+	windowIsFinsih = false;
+	window.clear();
+}
+
+
+void EndDrawWindow()
+{
+	drawMode = -1;
+	if (window.size() > 2)
+	{
+		window.push_back(window[0]);
+		windowIsFinsih = true;
+		sensFenetre = DetectWindowDirection();
+	}
+	else
+	{
+		window.clear();
+	}
+}
+
+
+void StartDrawNewPolygon()
+{
+	if (drawMode == 0)
+		EndDrawWindow();
+	if (drawMode == 1)
+		EndDrawPolygon();
+
+	drawMode = 1;
+	currentPolygon++;
+	polygons.push_back(vector<point>());
+	polygonIsFinsih.push_back(false);
+}
+
+
+void EndDrawPolygon()
+{
+	drawMode = -1;
+	polygons[currentPolygon].push_back(polygons[currentPolygon][0]);
+	polygonIsFinsih[currentPolygon] = true;
+}
+
+
+#pragma endregion MENU
 
 
 
@@ -396,7 +507,7 @@ bool IntersectSegment(point a, point b, point c, point d)
 
 void RemplissageLCA(vector<point> polygon, float r, float g, float b)
 {
-
+	
 }
 
 
