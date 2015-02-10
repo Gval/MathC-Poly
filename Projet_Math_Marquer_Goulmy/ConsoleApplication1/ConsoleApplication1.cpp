@@ -236,12 +236,25 @@ void Mouse(int button, int state, int x, int y)
 void Keyboard(unsigned char touche, int x, int y){
 	switch (touche)
 	{
-	case 'q':/* Quitter le programme */
+	case VK_ESCAPE:/* Quitter le programme */
 		exit(0);
 		break;
 
 	case 'r':
 		Reset();
+		break;
+
+	case 'f':
+		StartDrawWindow();
+		break;
+
+	case 'p':
+		StartDrawNewPolygon();
+		break;
+
+	case VK_RETURN:
+		EndDrawWindow();
+		EndDrawPolygon();
 		break;
 	}
 
@@ -348,8 +361,7 @@ void Reset()
 
 void StartDrawWindow()
 {
-	if (drawMode == 1)
-		EndDrawPolygon();
+	EndDrawPolygon();
 
 	drawMode = 0;
 	windowIsFinsih = false;
@@ -378,10 +390,8 @@ void EndDrawWindow()
 
 void StartDrawNewPolygon()
 {
-	if (drawMode == 0)
-		EndDrawWindow();
-	else if (drawMode == 1)
-		EndDrawPolygon();
+	EndDrawWindow();
+	EndDrawPolygon();
 
 	drawMode = 1;
 	currentPolygon++;
