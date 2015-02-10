@@ -28,6 +28,8 @@
 #include <vector> //Ne pas oublier !
 #include <math.h>
 #include <stack>
+#include <list>
+#include <algorithm>
 using namespace std;
 
 
@@ -37,12 +39,26 @@ struct point
 	float x, y;
 
 	point(){};
-	point(float _x, float _y)
+	point(float _x, float _y) : x(_x), y(_y)
 	{
-		x = _x;
-		y = _y;
 	}
 };
+
+struct ElementLCA
+{
+	float x, yMax, slope;
+
+	ElementLCA(){};
+	ElementLCA(float _x, float _yMax, float _slope) : x(_x), yMax(_yMax), slope(_slope)
+	{
+	}
+};
+inline bool operator<(const ElementLCA& a, const ElementLCA& b){ return a.x < b.x; }
+inline bool operator>(const ElementLCA& a, const ElementLCA& b){ return b < a; }
+inline bool operator<=(const ElementLCA& a, const ElementLCA& b){ return !(b < a); }
+inline bool operator>=(const ElementLCA& a, const ElementLCA& b){ return !(a < b); }
+inline bool operator==(const ElementLCA& a, const ElementLCA& b){ return !(a < b || b < a); }
+inline bool operator!=(const ElementLCA& a, const ElementLCA& b){ return (a < b || b < a); }
 
 
 // Window variables
@@ -190,8 +206,8 @@ void DrawPolygonFlat(vector<point> polygon, float r, float g, float b)
 	//RemplissageRégionConnexité4Recursif(windowWidth * 0.5f, windowHeight * 0.5f, r, g, b);
 	//RemplissageRégionConnexité4Iteratif(windowWidth * 0.5f, windowHeight * 0.5f, r, g, b);
 	//RemplissageLigne(windowWidth * 0.5f, windowHeight * 0.5f, r, g, b);
-	RemplissageRectEG(polygon, r, g,  b);
-	//RemplissageLCA(polygon, r, g, b);
+	//RemplissageRectEG(polygon, r, g,  b);
+	RemplissageLCA(polygon, r, g, b);
 }
 
 
@@ -303,7 +319,7 @@ void Reset()
 	window.clear();
 
 	polygons.clear();
-	currentPolygon = 0;
+	currentPolygon = -1;
 	polygonIsFinsih.clear();
 }
 
@@ -321,16 +337,19 @@ void StartDrawWindow()
 
 void EndDrawWindow()
 {
-	drawMode = -1;
-	if (window.size() > 2)
+	if (drawMode == 0)
 	{
-		window.push_back(window[0]);
-		windowIsFinsih = true;
-		sensFenetre = DetectWindowDirection();
-	}
-	else
-	{
-		window.clear();
+		drawMode = -1;
+		if (window.size() > 2)
+		{
+			window.push_back(window[0]);
+			windowIsFinsih = true;
+			sensFenetre = DetectWindowDirection();
+		}
+		else
+		{
+			window.clear();
+		}
 	}
 }
 
@@ -339,7 +358,7 @@ void StartDrawNewPolygon()
 {
 	if (drawMode == 0)
 		EndDrawWindow();
-	if (drawMode == 1)
+	else if (drawMode == 1)
 		EndDrawPolygon();
 
 	drawMode = 1;
@@ -351,9 +370,12 @@ void StartDrawNewPolygon()
 
 void EndDrawPolygon()
 {
-	drawMode = -1;
-	polygons[currentPolygon].push_back(polygons[currentPolygon][0]);
-	polygonIsFinsih[currentPolygon] = true;
+	if (drawMode == 1)
+	{
+		drawMode = -1;
+		polygons[currentPolygon].push_back(polygons[currentPolygon][0]);
+		polygonIsFinsih[currentPolygon] = true;
+	}
 }
 
 
@@ -507,7 +529,72 @@ bool IntersectSegment(point a, point b, point c, point d)
 
 void RemplissageLCA(vector<point> polygon, float r, float g, float b)
 {
+	point RectEG[2];
+	RectangleEnglobant(polygon, RectEG);
+
+	int yMin = int(RectEG[0].y) - 2;
+	int yMax = int(RectEG[1].y) + 2;
+
+	vector<vector<ElementLCA>> SI(yMax - yMin);
+
+	for (int i = 0; i < polygon.size() - 1; ++i)
+	{
+		float x;
+		float yMin_;
+		float yMax_;
+		float slope;
+		if (polygon[i].y < polygon[i + 1].y)
+		{
+			x = polygon[i].x;
+			yMin_ = int(polygon[i].y);
+			yMax_ = int(polygon[i + 1].y);
+			slope = (polygon[i + 1].x - polygon[i].x) / (yMax_ - yMin_);
+		}
+		else if (polygon[i].y > polygon[i + 1].y)
+		{
+			x = polygon[i + 1].x;
+			yMin_ = int(polygon[i + 1].y);
+			yMax_ = int(polygon[i].y);
+			slope = (polygon[i].x - polygon[i + 1].x) / (yMax_ - yMin_);
+		}
+		SI[yMin_ - yMin].push_back(ElementLCA(x, yMax_, slope));
+	}
 	
+	vector<ElementLCA> LCA;
+
+	for (int i = 0; i < SI.size(); ++i)
+	{
+		for (int j = 0; j < SI[i].size(); ++j)
+		{
+			LCA.push_back(SI[i][j]);
+		}
+
+		for (int j = LCA.size() - 1; j > -1; --j)
+		{
+			if (i + yMin >= LCA[j].yMax)
+				LCA.erase(LCA.begin() + j);
+			else
+				LCA[j].x += LCA[j].slope;
+		}
+
+		sort(LCA.begin(), LCA.end());
+
+		if (LCA.size() % 2 == 0)
+		{
+			int nbCouple = LCA.size() / 2;
+
+			for (int j = 0; j < nbCouple; ++j)
+			{
+				for (int k = LCA[j * 2].x; k < LCA[(j * 2) + 1].x; ++k)
+				{
+					glBegin(GL_POINTS);
+					glColor3f(r, g, b);
+					glVertex2i(k, i + yMin);
+					glEnd();
+				}
+			}
+		}
+	}
 }
 
 
@@ -605,7 +692,7 @@ point Intersection(point a, point b, point c, point d)
 
 	point i;
 	i.x = ((1 - matriceRes[0]) * a.x) + (matriceRes[0] * b.x);
-	i.y = ((1 - matriceRes[0]) * a.y) + (matriceRes[0] * b.y);;
+	i.y = ((1 - matriceRes[0]) * a.y) + (matriceRes[0] * b.y);
 
 	return i;
 }
