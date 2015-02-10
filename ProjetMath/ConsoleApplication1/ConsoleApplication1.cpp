@@ -72,6 +72,7 @@ bool windowIsFinsih = false;
 bool sensFenetre = true;
 int currentPolygon = -1;
 vector<bool> polygonIsFinsih;
+int remplissageMode = 1;
 
 
 // Polygons variables
@@ -90,6 +91,7 @@ void AddMenu();
 void Select(int selection);
 void SelectDrawWindow(int selection);
 void SelectDrawPolygon(int selection);
+void SelectRemplissage(int selection);
 void Reset();
 void StartDrawWindow();
 void EndDrawWindow();
@@ -206,8 +208,10 @@ void DrawPolygonFlat(vector<point> polygon, float r, float g, float b)
 	//RemplissageRégionConnexité4Recursif(windowWidth * 0.5f, windowHeight * 0.5f, r, g, b);
 	//RemplissageRégionConnexité4Iteratif(windowWidth * 0.5f, windowHeight * 0.5f, r, g, b);
 	//RemplissageLigne(windowWidth * 0.5f, windowHeight * 0.5f, r, g, b);
-	//RemplissageRectEG(polygon, r, g,  b);
-	RemplissageLCA(polygon, r, g, b);
+	if (remplissageMode == 0)
+		RemplissageRectEG(polygon, r, g,  b);
+	else if (remplissageMode == 1)
+		RemplissageLCA(polygon, r, g, b);
 }
 
 
@@ -260,9 +264,13 @@ void AddMenu()
 	int menuPolygon = glutCreateMenu(SelectDrawPolygon);
 	glutAddMenuEntry("Start New", 1);
 	glutAddMenuEntry("End", 2);
+	int menuRemplissage = glutCreateMenu(SelectRemplissage);
+	glutAddMenuEntry("RectEG", 1);
+	glutAddMenuEntry("LCA", 2);
 	glutCreateMenu(Select);
 	glutAddSubMenu("Draw Window", menuWindow);
 	glutAddSubMenu("Draw Polygon", menuPolygon);
+	glutAddSubMenu("Remplissage", menuRemplissage);
 	glutAddMenuEntry("Reset", 3);
 	glutAddMenuEntry("Quitter", 0);
 	glutAttachMenu(GLUT_RIGHT_BUTTON);
@@ -305,6 +313,20 @@ void SelectDrawPolygon(int selection)
 		break;
 	case 2:
 		EndDrawPolygon();
+		break;
+	}
+	glutPostRedisplay();
+}
+
+
+void SelectRemplissage(int selection)
+{
+	switch (selection) {
+	case 1:
+		remplissageMode = 0;
+		break;
+	case 2:
+		remplissageMode = 1;
 		break;
 	}
 	glutPostRedisplay();
